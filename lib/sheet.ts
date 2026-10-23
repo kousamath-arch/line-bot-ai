@@ -47,26 +47,46 @@ function parseCsv(text: string): string[][] {
   return rows;
 }
 
+// ถ้าเป็นลิงก์หน้าแก้ไข/แชร์ของ Google Sheet ให้แปลงเป็นลิงก์ export CSV
+function toCsvUrl(url: string): string {
+  const m = url.match(/^https:\/\/docs\.google\.com\/spreadsheets\/d\/([^/]+)\/(edit|view|htmlview|pubhtml)/);
+  if (!m) return url;
+  const gid = url.match(/[#?&]gid=(\d+)/)?.[1] ?? "0";
+  return `https://docs.google.com/spreadsheets/d/${m[1]}/export?format=csv&gid=${gid}`;
+}
+
+// ตัดช่องว่าง/อักขระล่องหนที่ติดมากับหัวคอลัมน์ และ normalize Unicode
+function normHeader(h: string): string {
+  return h.replace(/[\s​-‍﻿]/g, "").normalize("NFC");
+}
+
 export async function getFaq(): Promise<FaqItem[]> {
   const now = Date.now();
   if (cache && cache.expiresAt > now) return cache.items;
 
-  const url = process.env.SHEET_CSV_URL;
-  if (!url) throw new Error("SHEET_CSV_URL is not set");
+  const rawUrl = process.env.SHEET_CSV_URL?.trim();
+  if (!rawUrl) throw new Error("SHEET_CSV_URL is not set");
 
-  const res = await fetch(url, {
+  const res = await fetch(toCsvUrl(rawUrl), {
     cache: "no-store",
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`Sheet fetch failed: HTTP ${res.status}`);
 
   const text = (await res.text()).replace(/^﻿/, "");
+  if (/^\s*<(!doctype|html)/i.test(text)) {
+    throw new Error(
+      "SHEET_CSV_URL returned HTML, not CSV (sheet is not public or the URL is not a CSV link)",
+    );
+  }
   const rows = parseCsv(text);
-  const header = (rows[0] ?? []).map((h) => h.trim());
+  const header = (rows[0] ?? []).map(normHeader);
   const qIdx = header.indexOf("คำถาม");
   const aIdx = header.indexOf("คำตอบ");
   if (qIdx < 0 || aIdx < 0) {
-    throw new Error('Sheet must have columns "คำถาม" and "คำตอบ"');
+    throw new Error(
+      `Sheet must have columns "คำถาม" and "คำตอบ" but first row was: ${JSON.stringify(rows[0] ?? [])}`,
+    );
   }
 
   const items = rows
