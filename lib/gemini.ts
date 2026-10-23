@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 
 export const DEFAULT_MESSAGE =
   "เรื่องนี้น้องลูกแก้วไม่สามารถตอบได้ เดี๋ยวรอพ่อหมอมาตอบเองนะครับ/คะ";
@@ -55,6 +55,8 @@ export async function askGemini(
     config: {
       temperature: 1.0,
       maxOutputTokens: 1024,
+      // FAQ lookup ไม่ต้องคิดลึก: ลด thinking ให้ตอบเร็วและไม่กินโควตา maxOutputTokens
+      thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
       // ตัดที่ฝั่งเรา ไม่ใช้ httpOptions.timeout เพราะ Gemini API ปฏิเสธ deadline สั้นกว่า ~10s
       abortSignal: AbortSignal.timeout(timeoutMs),
     },
