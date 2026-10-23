@@ -55,7 +55,7 @@ export async function askGemini(
     config: {
       temperature: 1.0,
       maxOutputTokens: 1024,
-      httpOptions: { timeout: timeoutMs },
+      // ตัดที่ฝั่งเรา ไม่ใช้ httpOptions.timeout เพราะ Gemini API ปฏิเสธ deadline สั้นกว่า ~10s
       abortSignal: AbortSignal.timeout(timeoutMs),
     },
   });
